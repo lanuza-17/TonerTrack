@@ -177,4 +177,99 @@ function ejecutarProcesoToner() {
     console.log("Archivo procesado y guardado en el historial exitosamente.");
 }
 
-// ... (Funciones auxiliares getUltimoArchivo, cargarDatosReporte, enviarCorreoAlertas se mantienen igual)
+// ============================================================================
+// FUNCIONES AUXILIARES
+// ============================================================================
+
+/**
+ * Obtiene el archivo CSV más reciente de una carpeta de Drive.
+ */
+function getUltimoArchivo(folder) {
+    const files = folder.getFilesByType(MimeType.CSV);
+    let latestFile = null;
+    let maxDate = 0;
+    
+    while (files.hasNext()) {
+        const file = files.next();
+        if (file.getDateCreated().getTime() > maxDate) {
+            maxDate = file.getDateCreated().getTime();
+            latestFile = file;
+        }
+    }
+    return latestFile;
+}
+
+/**
+ * Lee el archivo CSV y retorna un diccionario con la llave "Serial|SKU"
+ */
+function cargarDatosReporte(file) {
+    const csvString = file.getBlob().getDataAsString();
+    const csvData = Utilities.parseCsv(csvString);
+    const dictData = {};
+    
+    if (csvData.length < 2) return dictData;
+    
+    // Tratamos de encontrar las columnas por el nombre del encabezado
+    const headers = csvData[0].map(h => String(h).toLowerCase().trim());
+    
+    let idxSerial = headers.findIndex(h => h.includes('serial number') || h.includes('printer serial'));
+    let idxSKU = headers.findIndex(h => h.includes('part number') || h.includes('sku') || h.includes('consumable part'));
+    let idxNivel = headers.findIndex(h => h.includes('level') || h.includes('remaining'));
+    let idxSNToner = headers.findIndex(h => h.includes('consumable serial') || h.includes('s/n toner'));
+    
+    // Fallback: Índices por defecto si no se encuentran las cabeceras
+    if (idxSerial === -1) idxSerial = 0; 
+    if (idxSKU === -1) idxSKU = 4;
+    if (idxNivel === -1) idxNivel = 5;
+    if (idxSNToner === -1) idxSNToner = 6;
+    
+    for (let i = 1; i < csvData.length; i++) {
+        const row = csvData[i];
+        if (row.length <= Math.max(idxSerial, idxSKU, idxNivel, idxSNToner)) continue;
+        
+        const serial = String(row[idxSerial]).trim();
+        const sku = String(row[idxSKU]).trim();
+        const key = `${serial}|${sku}`;
+        
+        let nivelRaw = String(row[idxNivel]).replace('%', '').trim();
+        let nivel = parseFloat(nivelRaw);
+        if (nivel > 1) nivel = nivel / 100; // Convertir 10 a 0.10
+        
+        const snToner = String(row[idxSNToner]).trim();
+        
+        dictData[key] = {
+            nivel: isNaN(nivel) ? 0 : nivel,
+            snToner: snToner
+        };
+    }
+    
+    return dictData;
+}
+
+/**
+ * Envía un correo con la tabla de alertas críticas
+ */
+function enviarCorreoAlertas(alertas) {
+    if (!CONFIG.EMAIL_ALERTAS) return;
+    
+    let htmlBody = "<h3>Alerta Crítica de Tóner (Nivel <= 10%)</h3>";
+    htmlBody += "<table border='1' cellpadding='5' style='border-collapse: collapse;'>";
+    htmlBody += "<tr><th>Región</th><th>Hostname</th><th>SKU</th><th>Nivel</th></tr>";
+    
+    alertas.forEach(alerta => {
+        htmlBody += `<tr>
+            <td>${alerta.region}</td>
+            <td>${alerta.hostname}</td>
+            <td>${alerta.sku}</td>
+            <td style='color:red; font-weight:bold;'>${alerta.nivel}</td>
+        </tr>`;
+    });
+    
+    htmlBody += "</table>";
+    
+    MailApp.sendEmail({
+        to: CONFIG.EMAIL_ALERTAS,
+        subject: "ALERTA: Tóner Crítico en Impresoras",
+        htmlBody: htmlBody
+    });
+}
