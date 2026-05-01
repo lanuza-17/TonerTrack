@@ -35,26 +35,28 @@ Es el motor de actualización de datos. Hace lo siguiente:
 
 ---
 
-## Error Común: `Exception: Illegal spreadsheet id or key`
+## 🛠 Mini-Tutorial: Cómo obtener el ID de un Google Sheet
 
-Si recibes el error:
-`Exception: Illegal spreadsheet id or key: ID_DE_TU_BITACORA_REGIONES`
+Para que el script funcione correctamente, necesitas indicarle los IDs exactos de tus hojas de cálculo en la configuración (`CONFIG`). 
 
-Este error ocurre **exclusivamente en la línea 6** del script dentro del bloque de `CONFIG`:
+El ID de un Google Sheet es una cadena larga de letras y números que se encuentra en la URL de tu navegador.
+
+### Pasos para encontrar el ID:
+
+1. Abre tu hoja de cálculo (por ejemplo, tu "Bitácora de Regiones") en el navegador.
+2. Observa la barra de direcciones (URL) en la parte superior.
+3. La URL tendrá un formato como este:
+   `https://docs.google.com/spreadsheets/d/1abc123DEF456ghi789jkl/edit#gid=0`
+4. El **ID de tu hoja de cálculo** es **únicamente** la parte que está entre `/d/` y `/edit`.
+5. Cópialo y pégalo en tu código.
+
+![Cómo encontrar el ID en la URL](assets/google_sheets_id_url.png)
 
 ```javascript
-    ID_BITACORA_PRINCIPAL: "ID_DE_TU_BITACORA_REGIONES",
+// Ejemplo de cómo se ve en el código:
+const CONFIG = {
+    // ...
+    ID_BITACORA_PRINCIPAL: "1abc123DEF456ghi789jkl", // ¡Pega tu ID aquí!
+    // ...
+};
 ```
-
-**Causa del problema:**
-La función `ejecutarProcesoToner` intenta abrir el archivo de Excel (Google Sheets) usando `SpreadsheetApp.openById(CONFIG.ID_BITACORA_PRINCIPAL)`. El script está intentando buscar un archivo en Google Drive cuyo ID literal sea `"ID_DE_TU_BITACORA_REGIONES"`. Ese texto es solo un **texto de relleno o ejemplo (placeholder)**. Los verdaderos IDs de Google Sheets son una cadena larga de letras y números.
-
-**Cómo solucionarlo:**
-1. Abre tu hoja de cálculo "Bitácora de Regiones" en el navegador.
-2. Mira la barra de direcciones (URL). Será algo como: `https://docs.google.com/spreadsheets/d/1abc123DEF456ghi789jkl/edit#gid=0`
-3. Copia **solo** la parte que está entre `/d/` y `/edit` (en el ejemplo: `1abc123DEF456ghi789jkl`).
-4. Ve a tu script y reemplaza el texto de relleno con tu ID real:
-   ```javascript
-   ID_BITACORA_PRINCIPAL: "1abc123DEF456ghi789jkl", // ¡Pon el tuyo aquí!
-   ```
-Una vez que hagas ese cambio y guardes, el activador dejará de fallar.
