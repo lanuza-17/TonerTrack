@@ -22,14 +22,12 @@ const CONFIG = {
  */
 function procesoCompletoDescargaYActualizacion() {
     console.log("--- 1. BUSCANDO NUEVOS REPORTES EN GMAIL ---");
-    const huboNuevosArchivos = guardarAdjuntosCSV();
+    guardarAdjuntosCSV();
 
-    if (huboNuevosArchivos) {
-        console.log("--- 2. ACTUALIZANDO BITÁCORA ---");
-        ejecutarProcesoToner();
-    } else {
-        console.log("No se encontraron correos nuevos sin procesar. Fin del proceso.");
-    }
+    console.log("--- 2. VERIFICANDO ARCHIVOS SIN PROCESAR ---");
+    // Ahora siempre llamamos a ejecutarProcesoToner, 
+    // y dentro validamos si el último archivo ya fue procesado o no.
+    ejecutarProcesoToner();
 }
 
 /**
@@ -72,12 +70,25 @@ function guardarAdjuntosCSV() {
  * PARTE 2: ACTUALIZAR BITÁCORA
  */
 function ejecutarProcesoToner() {
-    const ss = SpreadsheetApp.openById(CONFIG.ID_BITACORA_PRINCIPAL);
     const folder = DriveApp.getFolderById(CONFIG.CARPETA_REPORTES_ID);
     const latestFile = getUltimoArchivo(folder);
 
-    if (!latestFile) return;
+    if (!latestFile) {
+        console.log("La carpeta de reportes está vacía.");
+        return;
+    }
 
+    // --- NUEVA LÓGICA: Verificar si ya fue procesado ---
+    const prop = PropertiesService.getScriptProperties();
+    const ultimoIdProcesado = prop.getProperty('ULTIMO_ARCHIVO_PROCESADO_ID');
+    
+    if (latestFile.getId() === ultimoIdProcesado) {
+        console.log("No hay archivos nuevos sin procesar. Fin del proceso.");
+        return;
+    }
+
+    console.log("Procesando nuevo archivo: " + latestFile.getName());
+    const ss = SpreadsheetApp.openById(CONFIG.ID_BITACORA_PRINCIPAL);
     const dictData = cargarDatosReporte(latestFile);
     const ssLog = SpreadsheetApp.openById(CONFIG.ID_SHEET_AUDITORIA);
     let sheetLog = ssLog.getSheetByName("Cambios_Consolidado") || ssLog.insertSheet("Cambios_Consolidado");
@@ -160,6 +171,10 @@ function ejecutarProcesoToner() {
     }
 
     if (alertasCriticas.length > 0) enviarCorreoAlertas(alertasCriticas);
+
+    // Marcar el archivo como procesado exitosamente
+    prop.setProperty('ULTIMO_ARCHIVO_PROCESADO_ID', latestFile.getId());
+    console.log("Archivo procesado y guardado en el historial exitosamente.");
 }
 
 // ... (Funciones auxiliares getUltimoArchivo, cargarDatosReporte, enviarCorreoAlertas se mantienen igual)
